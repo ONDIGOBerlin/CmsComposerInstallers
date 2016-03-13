@@ -45,6 +45,7 @@ class Plugin implements PluginInterface, EventSubscriberInterface {
 	 */
 	public static function getSubscribedEvents() {
 		return array(
+			ScriptEvents::PRE_INSTALL_CMD => 'preInstall',
 			ScriptEvents::POST_AUTOLOAD_DUMP => 'postAutoload'
 		);
 	}
@@ -53,18 +54,6 @@ class Plugin implements PluginInterface, EventSubscriberInterface {
 	 * {@inheritDoc}
 	 */
 	public function activate(Composer $composer, IOInterface $io) {
-		$filesystem = new Filesystem();
-		$composer
-			->getInstallationManager()
-			->addInstaller(
-				new CoreInstaller($composer, $filesystem)
-			);
-		$composer
-			->getInstallationManager()
-			->addInstaller(
-				new ExtensionInstaller($composer, $filesystem)
-			);
-
 		$cache = null;
 		if ($composer->getConfig()->get('cache-files-ttl') > 0) {
 			$cache = new Cache($io, $composer->getConfig()->get('cache-files-dir'), 'a-z0-9_./');
@@ -75,6 +64,33 @@ class Plugin implements PluginInterface, EventSubscriberInterface {
 			->setDownloader(
 				't3x',
 				new Downloader\T3xDownloader($io, $composer->getConfig(), null, $cache)
+			);
+	}
+
+	/**
+	 * @param \Composer\Script\Event $event
+	 */
+	public function preInstall(\Composer\Script\Event $event) {
+		$composer = $event->getComposer();
+		$extra = $composer->getPackage()->getExtra();
+
+		if ($event->isDevMode() && isset($extra['typo3/cms-dev'])) {
+			$extra['typo3/cms'] = $extra['typo3/cms-dev'];
+			unset($extra['typo3/cms-dev']);
+
+			$composer->getPackage()->setExtra($extra);
+		}
+
+		$filesystem = new Filesystem();
+		$composer
+			->getInstallationManager()
+			->addInstaller(
+				new CoreInstaller($composer, $filesystem)
+			);
+		$composer
+			->getInstallationManager()
+			->addInstaller(
+				new ExtensionInstaller($composer, $filesystem)
 			);
 	}
 
