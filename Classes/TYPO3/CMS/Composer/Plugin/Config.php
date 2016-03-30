@@ -20,6 +20,7 @@ class Config {
 		'cms-package-dir' => 'typo3_src',
 		'use-ext-dir' => true,
 		'composer-mode' => true,
+		'establish-symlinks' => true,
 	);
 
 	/**
