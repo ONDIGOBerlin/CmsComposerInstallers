@@ -18,6 +18,9 @@ use Composer\Cache;
 use Composer\Composer;
 use Composer\EventDispatcher\EventSubscriberInterface;
 use Composer\Installer\BinaryInstaller;
+use Composer\Installer\InstallerEvent;
+use Composer\Installer\InstallerEvents;
+use Composer\Installer\PackageEvents;
 use Composer\IO\IOInterface;
 use Composer\Plugin\PluginInterface;
 use Composer\Script\Event;
@@ -50,6 +53,20 @@ class Plugin implements PluginInterface, EventSubscriberInterface
      */
     public function activate(Composer $composer, IOInterface $io)
     {
+        $cache = null;
+        if ($composer->getConfig()->get('cache-files-ttl') > 0) {
+            $cache = new Cache($io, $composer->getConfig()->get('cache-files-dir'), 'a-z0-9_./');
+        }
+
+        $isDevMode = !in_array('--no-dev', $_SERVER['argv']);
+
+        $extra = $composer->getPackage()->getExtra();
+        if ($isDevMode && isset($extra['typo3/cms-dev'])) {
+            $extra['typo3/cms'] = $extra['typo3/cms-dev'];
+            unset($extra['typo3/cms-dev']);
+            $composer->getPackage()->setExtra($extra);
+        }
+
         $filesystem = new Filesystem();
         $binaryInstaller = new BinaryInstaller($io, rtrim($composer->getConfig()->get('bin-dir'), '/'), $composer->getConfig()->get('bin-compat'), $filesystem);
         $pluginConfig = Config::load($composer);
@@ -63,12 +80,6 @@ class Plugin implements PluginInterface, EventSubscriberInterface
             ->addInstaller(
                 new ExtensionInstaller($io, $composer, $filesystem, $pluginConfig, $binaryInstaller)
             );
-
-        $cache = null;
-        if ($composer->getConfig()->get('cache-files-ttl') > 0) {
-            $cache = new Cache($io, $composer->getConfig()->get('cache-files-dir'), 'a-z0-9_./');
-        }
-
         $composer
             ->getDownloadManager()
             ->setDownloader(
